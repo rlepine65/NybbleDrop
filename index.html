@@ -562,46 +562,73 @@
             drawBoard();
         }
 
-        // Returns the set of board positions (as "r,c" strings) that are 1s
-        // vertically adjacent to another 1 -- these are the cells that will be cancelled.
-        function findConnected1s() {
+        // Returns every board cell that will be removed in the next cancel pass:
+        // vertically-adjacent same-digit pairs AND all cells in any complete byte
+        // (full row of 8 ones, or 8 consecutive ones in a column).
+        // Used both for the green preview flash and as the removal list.
+        function findAllDoomed() {
             const result = new Set();
+
+            // Vertical adjacent same-digit pairs
             for (let r = 0; r < HEIGHT; r++) {
                 for (let c = 0; c < WIDTH; c++) {
-                    if (board[r][c] !== '1') continue;
-                    if ((r > 0 && board[r-1][c] === '1') || (r < HEIGHT-1 && board[r+1][c] === '1')) {
+                    if (board[r][c] === null) continue;
+                    if ((r > 0 && board[r-1][c] === board[r][c]) ||
+                        (r < HEIGHT-1 && board[r+1][c] === board[r][c])) {
                         result.add(`${r},${c}`);
                     }
                 }
             }
-            return result;
-        }
-        
-        // Vertical-only same-digit cancel.
-        // Cancelled 0s clear the board but score 0 and do not count toward level progression.
-        // Cancelled 1s score 2^N - 1 per contiguous vertical run (binary stack value).
-        // Horizontal adjacency is intentionally ignored -- only a full 8-bit row (255) clears sideways.
-        function resolveAdjacent() {
-            const toRemove = new Set();
-            const dirs = [[1,0],[-1,0]];  // vertical only
+
+            // Complete byte rows (all WIDTH cells === '1')
             for (let r = 0; r < HEIGHT; r++) {
-                for (let c = 0; c < WIDTH; c++) {
-                    if (board[r][c] === null) continue;
-                    for (const [dr, dc] of dirs) {
-                        const nr = r + dr, nc = c + dc;
-                        if (nr >= 0 && nr < HEIGHT && nc >= 0 && nc < WIDTH
-                                && board[nr][nc] === board[r][c]) {
-                            toRemove.add(`${r},${c}`);
-                            toRemove.add(`${nr},${nc}`);
-                        }
+                if (board[r].every(cell => cell === '1')) {
+                    for (let c = 0; c < WIDTH; c++) result.add(`${r},${c}`);
+                }
+            }
+
+            // Complete byte columns (WIDTH consecutive '1's)
+            for (let c = 0; c < WIDTH; c++) {
+                for (let startR = 0; startR <= HEIGHT - WIDTH; startR++) {
+                    let ok = true;
+                    for (let i = 0; i < WIDTH; i++) {
+                        if (board[startR + i][c] !== '1') { ok = false; break; }
+                    }
+                    if (ok) {
+                        for (let i = 0; i < WIDTH; i++) result.add(`${startR + i},${c}`);
                     }
                 }
             }
 
-            // Score contiguous vertical runs of '1' per column (2^N - 1 per run).
-            let cancelScore = 0;
-            let onesCount = 0;
+            return result;
+        }
 
+        // Removes all doomed cells in one atomic pass, scoring them correctly:
+        //   - vertical runs of 1s: 2^N - 1 per run x level
+        //   - each complete byte row or column: +255 pts + flash
+        // Returns { totalRemoved, onesCount } for level-progression bookkeeping.
+        function resolveAllDoomed() {
+            const toRemove = findAllDoomed();
+            if (toRemove.size === 0) return { totalRemoved: 0, onesCount: 0 };
+
+            // Count bytes before any removal so they aren't missed
+            let bytesFound = 0;
+            for (let r = 0; r < HEIGHT; r++) {
+                if (board[r].every(cell => cell === '1')) bytesFound++;
+            }
+            for (let c = 0; c < WIDTH; c++) {
+                for (let startR = 0; startR <= HEIGHT - WIDTH; startR++) {
+                    let ok = true;
+                    for (let i = 0; i < WIDTH; i++) {
+                        if (board[startR + i][c] !== '1') { ok = false; break; }
+                    }
+                    if (ok) bytesFound++;
+                }
+            }
+
+            // Score vertical runs of '1's within the removal set (2^N - 1 per run)
+            let cancelScore = 0;
+            let onesCount   = 0;
             for (let c = 0; c < WIDTH; c++) {
                 let runLen = 0;
                 for (let r = 0; r < HEIGHT; r++) {
@@ -610,61 +637,32 @@
                     } else {
                         if (runLen > 0) {
                             cancelScore += (Math.pow(2, runLen) - 1);
-                            onesCount += runLen;
+                            onesCount   += runLen;
                             runLen = 0;
                         }
                     }
                 }
                 if (runLen > 0) {
                     cancelScore += (Math.pow(2, runLen) - 1);
-                    onesCount += runLen;
+                    onesCount   += runLen;
                 }
             }
 
+            // Apply scores and award bytes
+            if (cancelScore > 0) score += cancelScore * level;
+            for (let i = 0; i < bytesFound; i++) {
+                score += 255;
+                byteClears++;
+                queueFlash('FULL BYTE SCORE!');
+            }
+
+            // Remove all doomed cells
             for (const key of toRemove) {
                 const [r, c] = key.split(',').map(Number);
                 board[r][c] = null;
             }
 
-            return { cancelScore, onesCount, totalCancels: toRemove.size };
-        }
-
-        // Check for complete bytes: a full row of 8 ones (row byte) or 8 consecutive ones
-        // in a column (column byte). Row bytes take priority. Only one byte is cleared per
-        // call -- the settle loop re-enters gravity naturally after each clear.
-        // Returns true if a byte was cleared (+255 pts awarded).
-        function checkCompleteByte() {
-            // Row byte: all WIDTH cells in any row are '1', search from bottom up
-            for (let r = HEIGHT - 1; r >= 0; r--) {
-                if (board[r].every(cell => cell === '1')) {
-                    board.splice(r, 1);
-                    board.unshift(Array(WIDTH).fill(null));
-                    score += 255;
-                    byteClears++;
-                    queueFlash('FULL BYTE SCORE!');
-                    updateUI();
-                    return true;
-                }
-            }
-            // Column byte: 8 consecutive '1's anywhere in a column, search from bottom up
-            for (let c = 0; c < WIDTH; c++) {
-                for (let startR = HEIGHT - 8; startR >= 0; startR--) {
-                    let isByte = true;
-                    for (let i = 0; i < 8; i++) {
-                        if (board[startR + i][c] !== '1') { isByte = false; break; }
-                    }
-                    if (isByte) {
-                        // Null out the 8 cells; gravity in the settle loop resettles the column
-                        for (let i = 0; i < 8; i++) board[startR + i][c] = null;
-                        score += 255;
-                        byteClears++;
-                        queueFlash('FULL BYTE SCORE!');
-                        updateUI();
-                        return true;
-                    }
-                }
-            }
-            return false;
+            return { totalRemoved: toRemove.size, onesCount };
         }
 
         // Queued flash system -- messages stack up and play one at a time, never overlapping.
@@ -801,53 +799,47 @@
             }
             
             if (isSettling) {
-                // Highlight phase: briefly show connected 1s in green before cancelling
                 if (highlightCells !== null) {
+                    // Waiting for green flash to expire
                     if (timestamp - highlightTimer >= HIGHLIGHT_MS) {
                         highlightCells = null;
                         highlightDone  = true;
-                        gravityTimer   = 0; // proceed to cancel on next frame immediately
+                        gravityTimer   = 0; // fire cancel on next frame immediately
                     }
                 } else if (timestamp - gravityTimer > dropInterval) {
                     if (hasAnyFloatingDigits()) {
-                        // Phase 1: gravity -- drop all floating digits one step
                         performGravityStep();
                     } else {
-                        // Flash connected 1s green once before cancelling
-                        const connected = highlightDone ? new Set() : findConnected1s();
-                        if (connected.size > 0) {
-                            highlightCells = connected;
+                        // Preview all doomed cells (pairs + bytes) in green once, then cancel all
+                        const doomed = highlightDone ? new Set() : findAllDoomed();
+                        if (doomed.size > 0) {
+                            highlightCells = doomed;
                             highlightTimer = timestamp;
-                            gravityTimer = timestamp; // hold until highlight expires
+                            gravityTimer   = timestamp;
                         } else {
-                        highlightDone = false; // reset so the next gravity cycle can flash again
-                        // Phase 2: cancel -- remove vertically adjacent same-digit pairs
-                        const { cancelScore, onesCount, totalCancels } = resolveAdjacent();
-                        if (totalCancels > 0) {
-                            score += cancelScore * level;  // binary stack score x level
-                            const prevLevel5 = Math.floor(clears / 5);
-                            clears += onesCount;           // only 1-cancels advance level
-                            const newLevel5 = Math.floor(clears / 5);
-                            if (newLevel5 > prevLevel5 && level < 20) {
-                                level = Math.min(level + 1, 20);
-                            }
-                            updateUI();
-                            // cancellations create new gaps -- gravity resumes next tick
-                        } else if (checkCompleteByte()) {
-                            // Phase 3: byte clear -- a full 255 row or column byte was cleared
-                            // score and UI already updated; gravity resumes next tick
-                        } else {
-                            // Board fully settled, no more matches or bytes
-                            if (board.every(row => row.every(cell => cell === null))) {
-                                score += 255;
-                                queueFlash('CLEARED!');
+                            highlightDone = false;
+                            const { totalRemoved, onesCount } = resolveAllDoomed();
+                            if (totalRemoved > 0) {
+                                const prevLevel5 = Math.floor(clears / 5);
+                                clears += onesCount;
+                                const newLevel5 = Math.floor(clears / 5);
+                                if (newLevel5 > prevLevel5 && level < 20) {
+                                    level = Math.min(level + 1, 20);
+                                }
                                 updateUI();
+                                // gaps created -- gravity resumes next tick
+                            } else {
+                                // Board fully settled
+                                if (board.every(row => row.every(cell => cell === null))) {
+                                    score += 255;
+                                    queueFlash('CLEARED!');
+                                    updateUI();
+                                }
+                                isSettling = false;
+                                spawnNewPiece();
                             }
-                            isSettling = false;
-                            spawnNewPiece();
                         }
                     }
-                    } // end else (no connected 1s to highlight)
                     gravityTimer = timestamp;
                 }
             } 
