@@ -549,6 +549,13 @@
             }
             return moved;
         }
+
+        // Instantly land all floating digits so the cancel/byte-clear phase runs on the next frame.
+        function instantSettle() {
+            while (hasAnyFloatingDigits()) performGravityStep();
+            gravityTimer = 0; // age the timer so the next game-loop tick fires cancel logic immediately
+            drawBoard();
+        }
         
         // Vertical-only same-digit cancel.
         // Cancelled 0s clear the board but score 0 and do not count toward level progression.
@@ -879,7 +886,12 @@
             if (e.key === 's' || e.key === 'S' || e.key === ' ') setKeyLight('s', true);
             if (e.key === 'd' || e.key === 'D') setKeyLight('d', true);
 
-            if (!gameRunning || paused || gameOverFlag || isSettling) return;
+            if (!gameRunning || paused || gameOverFlag) return;
+
+            if (isSettling) {
+                if (['s','S',' '].includes(e.key)) { e.preventDefault(); instantSettle(); }
+                return;
+            }
 
             if (['a','A','ArrowLeft'].includes(e.key))  moveHorizontal(-1);
             if (['d','D','ArrowRight'].includes(e.key)) moveHorizontal(1);
@@ -923,7 +935,7 @@
             el.addEventListener('touchstart', e => {
                 e.preventDefault();
                 setKeyLight(id, true);
-                if (gameRunning && !paused && !gameOverFlag && !isSettling) onStart();
+                if (gameRunning && !paused && !gameOverFlag) onStart();
             }, { passive: false });
             el.addEventListener('touchend', e => {
                 e.preventDefault();
@@ -964,7 +976,7 @@
                 () => stopTouchRepeat()
             );
             bindTouchKey('s',
-                () => { hardDrop(); drawBoard(); },
+                () => { if (isSettling) instantSettle(); else { hardDrop(); drawBoard(); } },
                 null
             );
         };
