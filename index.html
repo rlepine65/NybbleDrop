@@ -422,6 +422,7 @@
         let sHeld = false;
         let highlightCells = null; // Set of "r,c" strings lit green before cancel
         let highlightTimer  = 0;
+        let highlightDone   = false; // true after flash shown; skips re-highlight until next gravity cycle
         const HIGHLIGHT_MS  = 450;
         
         class Piece {
@@ -804,20 +805,22 @@
                 if (highlightCells !== null) {
                     if (timestamp - highlightTimer >= HIGHLIGHT_MS) {
                         highlightCells = null;
-                        gravityTimer = 0; // proceed to cancel on next frame
+                        highlightDone  = true;
+                        gravityTimer   = 0; // proceed to cancel on next frame immediately
                     }
                 } else if (timestamp - gravityTimer > dropInterval) {
                     if (hasAnyFloatingDigits()) {
                         // Phase 1: gravity -- drop all floating digits one step
                         performGravityStep();
                     } else {
-                        // After gravity, flash any connected 1s green before cancelling
-                        const connected = findConnected1s();
+                        // Flash connected 1s green once before cancelling
+                        const connected = highlightDone ? new Set() : findConnected1s();
                         if (connected.size > 0) {
                             highlightCells = connected;
                             highlightTimer = timestamp;
-                            gravityTimer = timestamp; // hold here until highlight expires
+                            gravityTimer = timestamp; // hold until highlight expires
                         } else {
+                        highlightDone = false; // reset so the next gravity cycle can flash again
                         // Phase 2: cancel -- remove vertically adjacent same-digit pairs
                         const { cancelScore, onesCount, totalCancels } = resolveAdjacent();
                         if (totalCancels > 0) {
@@ -862,7 +865,7 @@
         function startGame() {
             board = Array.from({ length: HEIGHT }, () => Array(WIDTH).fill(null));
             score = 0; clears = 0; byteClears = 0; level = 1; dropInterval = 1000;
-            gameOverFlag = false; paused = false; gameRunning = true; isSettling = false; wHeld = false; sHeld = false; highlightCells = null;
+            gameOverFlag = false; paused = false; gameRunning = true; isSettling = false; wHeld = false; sHeld = false; highlightCells = null; highlightDone = false;
             
             nextNybble = Math.floor(Math.random() * 16);
             spawnNewPiece();
