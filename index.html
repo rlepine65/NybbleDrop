@@ -749,7 +749,7 @@
                 for (let c = 0; c < WIDTH; c++) {
                     if (board[r][c] !== null) {
                         const lit = highlightCells && highlightCells.has(`${r},${c}`);
-                        const color = lit ? '#39ff14' : '#00ffcc';
+                        const color = lit ? (board[r][c] === '1' ? '#39ff14' : '#ff4444') : '#00ffcc';
                         ctx.shadowColor = color;
                         ctx.shadowBlur = lit ? 28 : 18;
                         ctx.fillStyle = color;
