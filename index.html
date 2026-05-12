@@ -371,7 +371,7 @@
                 </div>
                 <div class="key-row">
                     <div class="key" id="key-a"><span class="key-letter">A</span><span class="key-fn">&#9664;</span></div>
-                    <div class="key" id="key-s"><span class="key-letter">S</span><span class="key-fn">DROP</span></div>
+                    <div class="key" id="key-s"><span class="key-letter">S</span><span class="key-fn">FAST</span></div>
                     <div class="key" id="key-d"><span class="key-letter">D</span><span class="key-fn">&#9654;</span></div>
                 </div>
             </div>
@@ -419,6 +419,7 @@
         let isSettling = false;
         let gravityTimer = 0;
         let wHeld = false;
+        let sHeld = false;
         
         class Piece {
             constructor() {
@@ -813,11 +814,10 @@
                     gravityTimer = timestamp;
                 }
             } 
-            else if (timestamp - lastDropTime > dropInterval) {
+            else if (timestamp - lastDropTime > (sHeld ? dropInterval / 2 : dropInterval)) {
                 if (!wHeld) {
                     if (!moveDown()) lockPiece();
                 }
-                // Always reset the timer -- releasing W starts a fresh interval, no instant drop
                 lastDropTime = timestamp;
             }
             
@@ -828,7 +828,7 @@
         function startGame() {
             board = Array.from({ length: HEIGHT }, () => Array(WIDTH).fill(null));
             score = 0; clears = 0; byteClears = 0; level = 1; dropInterval = 1000;
-            gameOverFlag = false; paused = false; gameRunning = true; isSettling = false; wHeld = false;
+            gameOverFlag = false; paused = false; gameRunning = true; isSettling = false; wHeld = false; sHeld = false;
             
             nextNybble = Math.floor(Math.random() * 16);
             spawnNewPiece();
@@ -898,7 +898,7 @@
             if (['q','Q'].includes(e.key))              rotatePiece(false);  // CCW
             if (['e','E','ArrowUp'].includes(e.key))    rotatePiece(true);   // CW
             if (['ArrowDown'].includes(e.key))          rotatePiece(false);  // CCW (arrow)
-            if (['s','S',' '].includes(e.key))          { e.preventDefault(); hardDrop(); }
+            if (['s','S',' '].includes(e.key))          { e.preventDefault(); sHeld = true; }
 
             drawBoard();
         }
@@ -908,7 +908,7 @@
             if (e.key === 'q' || e.key === 'Q') setKeyLight('q', false);
             if (e.key === 'e' || e.key === 'E') setKeyLight('e', false);
             if (e.key === 'a' || e.key === 'A') setKeyLight('a', false);
-            if (e.key === 's' || e.key === 'S' || e.key === ' ') setKeyLight('s', false);
+            if (e.key === 's' || e.key === 'S' || e.key === ' ') { sHeld = false; setKeyLight('s', false); }
             if (e.key === 'd' || e.key === 'D') setKeyLight('d', false);
         }
 
@@ -976,8 +976,8 @@
                 () => stopTouchRepeat()
             );
             bindTouchKey('s',
-                () => { if (isSettling) instantSettle(); else { hardDrop(); drawBoard(); } },
-                null
+                () => { if (isSettling) instantSettle(); else sHeld = true; },
+                () => { sHeld = false; }
             );
         };
     </script>
