@@ -177,6 +177,15 @@
             color: #111122;
             transform: scale(1.05);
         }
+
+        #sfx-btn {
+            padding: 10px 14px;
+            font-size: 20px;
+            line-height: 1;
+            opacity: 1;
+            transition: opacity 0.2s, transform 0.2s;
+        }
+        #sfx-btn.muted { opacity: 0.35; }
         
         .game-over-overlay {
             position: absolute;
@@ -305,7 +314,8 @@
                 <span class="stat-label">LEVEL</span>
             </div>
         </div>
-        <div style="display: flex; gap: 15px;">
+        <div style="display: flex; gap: 15px; align-items: center;">
+            <button id="sfx-btn" title="Toggle sound">🔊</button>
             <button id="pause-btn">PAUSE</button>
             <button id="restart-btn">START</button>
         </div>
@@ -425,7 +435,43 @@
         let highlightTimer  = 0;
         let highlightDone   = false; // true after flash shown; skips re-highlight until next gravity cycle
         const HIGHLIGHT_MS  = 450;
-        
+
+        // ── Audio ────────────────────────────────────────────────────────────────
+        let soundEnabled = true;
+        let _audioCtx    = null;
+        function audioCtx() {
+            if (!_audioCtx) _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            return _audioCtx;
+        }
+        // freq Hz, duration s, wave type, peak volume 0-1, optional pitch ramp target
+        function playTone(freq, dur, type = 'square', vol = 0.22, freqEnd = null) {
+            if (!soundEnabled) return;
+            const ctx = audioCtx();
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.type = type;
+            osc.frequency.setValueAtTime(freq, ctx.currentTime);
+            if (freqEnd) osc.frequency.exponentialRampToValueAtTime(freqEnd, ctx.currentTime + dur);
+            gain.gain.setValueAtTime(vol, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + dur);
+            osc.start(ctx.currentTime);
+            osc.stop(ctx.currentTime + dur + 0.01);
+        }
+        function schedTone(freq, t, dur, type, vol, freqEnd) {
+            setTimeout(() => playTone(freq, dur, type, vol, freqEnd), t * 1000);
+        }
+        // Cheery two-note chime for connecting 1s
+        function snd1s()    { playTone(523,0.07,'square',0.18); schedTone(784,0.07,0.12,'square',0.18); }
+        // Dull blip for connecting 0s
+        function snd0s()    { playTone(180,0.08,'square',0.14,120); }
+        // 4-note ascending arpeggio for a full byte
+        function sndByte()  { [523,659,784,1047].forEach((f,i) => schedTone(f,i*0.07,0.13,'square',0.22)); }
+        // Longer bright jingle for board clear
+        function sndClear() { [523,659,784,1047,1319,1568].forEach((f,i) => schedTone(f,i*0.08,0.18,'sine',0.2)); }
+        // ─────────────────────────────────────────────────────────────────────────
+
         class Piece {
             constructor() {
                 this.nybble = nextNybble !== null ? nextNybble : Math.floor(Math.random() * 16);
@@ -672,6 +718,8 @@
 
         function queueFlash(labelText) {
             flashQueue.push(labelText);
+            if (labelText === 'FULL BYTE SCORE!') sndByte();
+            if (labelText === 'CLEARED!')         sndClear();
             if (!flashBusy) runNextFlash();
         }
 
@@ -817,6 +865,11 @@
                             highlightCells = doomed;
                             highlightTimer = timestamp;
                             gravityTimer   = timestamp;
+                            // Play sound cues when the flash first appears
+                            const has1s = [...doomed].some(k => board[+k.split(',')[0]][+k.split(',')[1]] === '1');
+                            const has0s = [...doomed].some(k => board[+k.split(',')[0]][+k.split(',')[1]] === '0');
+                            if (has1s) snd1s();
+                            if (has0s) snd0s();
                         } else {
                             highlightDone = false;
                             const { totalRemoved, onesCount } = resolveAllDoomed();
@@ -946,6 +999,12 @@
 
         document.getElementById('pause-btn').addEventListener('click', pauseGame);
         document.getElementById('restart-btn').addEventListener('click', startGame);
+        document.getElementById('sfx-btn').addEventListener('click', () => {
+            soundEnabled = !soundEnabled;
+            const btn = document.getElementById('sfx-btn');
+            btn.textContent = soundEnabled ? '🔊' : '🔇';
+            btn.classList.toggle('muted', !soundEnabled);
+        });
         window.addEventListener('keydown', handleKey);
         window.addEventListener('keyup', handleKeyUp);
 
