@@ -252,7 +252,7 @@
         #menu-btn { display: none; }
 
         /* Mobile: show MENU, hide original 3 buttons */
-        body.mobile #menu-btn { display: inline-block; font-size: 11px; font-weight: bold; padding: 7px 10px; }
+        body.mobile #menu-btn { display: inline-block; font-size: 14px; font-weight: bold; padding: 7px 10px; }
         body.mobile #sfx-btn,
         body.mobile #pause-btn,
         body.mobile #restart-btn { display: none; }
@@ -981,7 +981,7 @@
             nextCtx.clearRect(0, 0, nextCanvas.width, nextCanvas.height);
             if (nextNybble === null) return;
             const digits = nextNybble.toString(2).padStart(4, '0').split('');
-            const nFontPx  = Math.round(nextCanvas.height * (isMobile ? 0.38 : 0.4)); // slightly smaller on mobile
+            const nFontPx  = Math.round(nextCanvas.height * (isMobile ? 0.55 : 0.4));
             const nSpacing = Math.round(nextCanvas.width  / 5);    // 52px at w=260
             const nBlur    = Math.round(nextCanvas.height * 0.125);// 15px at h=120
             nextCtx.font = `bold ${nFontPx}px monospace`;
