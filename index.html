@@ -969,7 +969,10 @@
                 for (let c = 0; c < WIDTH; c++) {
                     if (board[r][c] !== null) {
                         const lit = highlightCells && highlightCells.has(`${r},${c}`);
-                        const color = lit ? (board[r][c] === '1' ? '#39ff14' : '#ff4444') : '#00ffcc';
+                        const isOne = board[r][c] === '1';
+                        const color = lit
+                            ? (isOne ? '#FFE500' : '#ff4444')   // highlight: bright gold for 1s, red for 0s
+                            : (isOne ? '#FFD700' : '#00ffcc');  // normal: gold for 1s, cyan for 0s
                         ctx.shadowColor = color;
                         ctx.shadowBlur = lit ? blurLit : blurBoard;
                         ctx.fillStyle = color;
