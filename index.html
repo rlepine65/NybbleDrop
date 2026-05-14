@@ -1249,6 +1249,7 @@
 
         function bindTouchKey(id, onStart, onEnd) {
             const el = document.getElementById('key-' + id);
+            // Touch events (mobile)
             el.addEventListener('touchstart', e => {
                 e.preventDefault();
                 setKeyLight(id, true);
@@ -1263,6 +1264,20 @@
                 setKeyLight(id, false);
                 if (onEnd) onEnd();
             }, { passive: false });
+            // Mouse events (desktop)
+            el.addEventListener('mousedown', e => {
+                e.preventDefault();
+                setKeyLight(id, true);
+                if (gameRunning && !paused && !gameOverFlag) onStart();
+            });
+            el.addEventListener('mouseup', e => {
+                setKeyLight(id, false);
+                if (onEnd) onEnd();
+            });
+            el.addEventListener('mouseleave', e => {
+                setKeyLight(id, false);
+                if (onEnd) onEnd();
+            });
         }
 
         window.onload = () => {
