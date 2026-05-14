@@ -584,6 +584,7 @@
         let nextNybble = null;
         let score = 0;
         let bits = 0;
+        let bitsNextMilestone = 1024;
         let byteClears = 0;
         let level = 1;
         let highScore = Number(localStorage.getItem('nybbleHighScore')) || 0;
@@ -1061,6 +1062,12 @@
                                 if (newLevel5 > prevLevel5 && level < 20) {
                                     level = Math.min(level + 1, 20);
                                 }
+                                // 1024-bit milestone bonus
+                                while (bits >= bitsNextMilestone) {
+                                    score += 1024;
+                                    queueFlash('1024 BIT BONUS!');
+                                    bitsNextMilestone += 1024;
+                                }
                                 updateUI();
                                 // gaps created -- gravity resumes next tick
                             } else {
@@ -1091,7 +1098,7 @@
         
         function startGame() {
             board = Array.from({ length: HEIGHT }, () => Array(WIDTH).fill(null));
-            score = 0; bits = 0; byteClears = 0; level = 1; dropInterval = 1000;
+            score = 0; bits = 0; bitsNextMilestone = 1024; byteClears = 0; level = 1; dropInterval = 1000;
             gameOverFlag = false; paused = false; gameRunning = true; isSettling = false; wHeld = false; sHeld = false; sHeldStart = 0; highlightCells = null; highlightDone = false;
             
             nextNybble = Math.floor(Math.random() * 16);
