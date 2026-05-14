@@ -308,6 +308,8 @@
             max-width: 100%;
             box-sizing: border-box;
             gap: 8px;
+            transform: scaleX(0.95);
+            transform-origin: center;
         }
         body.mobile .title { font-size: 12px; letter-spacing: 1px; }
         body.mobile .stats { gap: 12px; font-size: 11px; }
@@ -923,7 +925,7 @@
             nextCtx.clearRect(0, 0, nextCanvas.width, nextCanvas.height);
             if (nextNybble === null) return;
             const digits = nextNybble.toString(2).padStart(4, '0').split('');
-            const nFontPx  = Math.round(nextCanvas.height * 0.4);  // 48px at h=120
+            const nFontPx  = Math.round(nextCanvas.height * (isMobile ? 0.2 : 0.4)); // 48px desktop, half on mobile
             const nSpacing = Math.round(nextCanvas.width  / 5);    // 52px at w=260
             const nBlur    = Math.round(nextCanvas.height * 0.125);// 15px at h=120
             nextCtx.font = `bold ${nFontPx}px monospace`;
