@@ -1118,19 +1118,22 @@
                     }
                     ctx.shadowBlur = 0;
                 } else {
-                    // BLOCK / LINE: each of the 4 positions gets its own Tetris colour
+                    // BLOCK / LINE: same blue/grey colour system as settled cells
                     for (let i = 0; i < pos.length; i++) {
-                        const p = pos[i];
+                        const p     = pos[i];
                         if (p.r < 0) continue;
-                        const pc  = PIECE_COLORS[i % PIECE_COLORS.length];
+                        const isOne = p.d === '1';
                         const bx  = p.c * CELL + 2, by = p.r * CELL + 2;
                         const bw  = CELL - 4,        bh = CELL - 4;
                         const cx2 = p.c * CELL + CELL / 2;
                         const cy2 = p.r * CELL + CELL / 2 + 2;
 
-                        ctx.shadowColor = pc;
+                        const blockColor = isOne ? 'rgba(40,120,255,0.90)' : 'rgba(150,150,165,0.55)';
+                        const glowColor  = isOne ? '#2878ff' : '#9696a5';
+
+                        ctx.shadowColor = glowColor;
                         ctx.shadowBlur  = blurPiece;
-                        ctx.fillStyle   = pc;
+                        ctx.fillStyle   = blockColor;
                         drawRRect(ctx, bx, by, bw, bh, radius);
                         ctx.fill();
                         ctx.shadowBlur  = 0;
@@ -1138,11 +1141,10 @@
                         ctx.lineWidth   = 1;
                         drawRRect(ctx, bx, by, bw, bh, radius);
                         ctx.stroke();
-                        // Digit in dark colour so it reads against bright block
                         ctx.font         = `bold ${labelPx}px monospace`;
                         ctx.textAlign    = 'center';
                         ctx.textBaseline = 'middle';
-                        ctx.fillStyle    = '#0a0a1f';
+                        ctx.fillStyle    = '#ffffff';
                         ctx.fillText(p.d, cx2, cy2);
                     }
                 }
