@@ -636,8 +636,12 @@
             const name = VIS_NAMES[visualMode];
             document.getElementById('vis-btn').textContent = name;
             const m = document.getElementById('menu-vis-btn');
-            if (m) m.textContent = '🎨  ' + name;
+            if (m) m.textContent = '🎨\u00a0 ' + name;
+            // Full redraw — clear both canvases then repaint from scratch
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            nextCtx.clearRect(0, 0, nextCanvas.width, nextCanvas.height);
             drawBoard();
+            drawNextPiece();
         }
         let _audioCtx    = null;
         function audioCtx() {
@@ -993,8 +997,15 @@
                 ctx.beginPath(); ctx.moveTo(0, y*CELL); ctx.lineTo(canvas.width, y*CELL); ctx.stroke();
             }
 
+            // Hard-reset canvas state so no previous mode lingers
+            ctx.shadowBlur   = 0;
+            ctx.shadowColor  = 'transparent';
+            ctx.globalAlpha  = 1;
+            ctx.lineWidth    = 1;
+            ctx.setTransform(1, 0, 0, 1, 0, 0); // clear any accidental transforms
+
             const digitPx   = Math.round(CELL * 0.6875);
-            const labelPx   = Math.round(CELL * 0.50);   // digit drawn on top of blocks
+            const labelPx   = Math.round(CELL * 0.50);
             const blurBoard = Math.round(CELL * 0.28);
             const blurPiece = Math.round(CELL * 0.50);
             const blurLit   = Math.round(CELL * 0.44);
@@ -1027,8 +1038,8 @@
                         ctx.shadowColor = color;
                         ctx.shadowBlur  = lit ? blurLit : blurBoard;
                         ctx.fillStyle   = lit
-                            ? (isOne ? 'rgba(255,215,0,0.88)' : 'rgba(255,68,68,0.75)')
-                            : (isOne ? 'rgba(0,255,204,0.48)'  : 'rgba(0,255,204,0.18)');
+                            ? (isOne ? 'rgba(255,215,0,0.88)'   : 'rgba(255,68,68,0.75)')
+                            : (isOne ? 'rgba(40,120,255,0.80)'  : 'rgba(150,150,165,0.40)');
                         drawRRect(ctx, bx, by, bw, bh, radius);
                         ctx.fill();
                         ctx.shadowBlur  = 0;
@@ -1036,12 +1047,12 @@
                         ctx.lineWidth   = 1.5;
                         drawRRect(ctx, bx, by, bw, bh, radius);
                         ctx.stroke();
-                        // Digit label on top (dark so it reads against the fill)
+                        // Digit label on top (white for dark fills, dark for lit gold)
                         ctx.font         = `bold ${labelPx}px monospace`;
                         ctx.textAlign    = 'center';
                         ctx.textBaseline = 'middle';
                         ctx.shadowBlur   = 0;
-                        ctx.fillStyle    = lit ? '#1a0a00' : '#001a14';
+                        ctx.fillStyle    = lit ? '#1a0a00' : '#ffffff';
                         ctx.fillText(board[r][c], cx, cy);
 
                     } else {
