@@ -612,6 +612,25 @@
         let visualMode = 0; // 0=DIGIT  1=BLOCK  2=LINE
         const VIS_NAMES = ['DIGIT', 'BLOCK', 'LINE'];
 
+        // Tetris-style colours for the 4 falling piece positions (BLOCK / LINE modes)
+        const PIECE_COLORS = ['#FF6B6B', '#FFD93D', '#6BCB77', '#A78BFA'];
+
+        // Rounded-rectangle path helper
+        function drawRRect(ctx, x, y, w, h, r) {
+            r = Math.min(r, w / 2, h / 2);
+            ctx.beginPath();
+            ctx.moveTo(x + r, y);
+            ctx.lineTo(x + w - r, y);
+            ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+            ctx.lineTo(x + w, y + h - r);
+            ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+            ctx.lineTo(x + r, y + h);
+            ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+            ctx.lineTo(x, y + r);
+            ctx.quadraticCurveTo(x, y, x + r, y);
+            ctx.closePath();
+        }
+
         function cycleVisualMode() {
             visualMode = (visualMode + 1) % 3;
             const name = VIS_NAMES[visualMode];
@@ -975,101 +994,147 @@
             }
 
             const digitPx   = Math.round(CELL * 0.6875);
+            const labelPx   = Math.round(CELL * 0.50);   // digit drawn on top of blocks
             const blurBoard = Math.round(CELL * 0.28);
             const blurPiece = Math.round(CELL * 0.50);
             const blurLit   = Math.round(CELL * 0.44);
+            const radius    = Math.round(CELL * 0.18);
 
+            // ── Settled board cells ─────────────────────────────────────────────
             for (let r = 0; r < HEIGHT; r++) {
                 for (let c = 0; c < WIDTH; c++) {
                     if (board[r][c] === null) continue;
                     const lit   = highlightCells && highlightCells.has(`${r},${c}`);
                     const isOne = board[r][c] === '1';
                     const color = lit ? (isOne ? '#FFD700' : '#ff4444') : '#00ffcc';
+                    const cx    = c * CELL + CELL / 2;
+                    const cy    = r * CELL + CELL / 2 + 2;
                     const bx = c * CELL + 2, by = r * CELL + 2;
                     const bw = CELL - 4,     bh = CELL - 4;
 
-                    ctx.shadowColor = color;
-
                     if (visualMode === 0) {
-                        // ── DIGIT mode: glowing text ─────────────────────────
+                        // ── DIGIT: glowing text only ──────────────────────────
                         ctx.font = `bold ${digitPx}px monospace`;
-                        ctx.textAlign = 'center';
+                        ctx.textAlign    = 'center';
                         ctx.textBaseline = 'middle';
-                        ctx.shadowBlur = lit ? blurLit : blurBoard;
-                        ctx.fillStyle  = color;
-                        ctx.fillText(board[r][c], c*CELL + CELL/2, r*CELL + CELL/2 + 2);
+                        ctx.shadowColor  = color;
+                        ctx.shadowBlur   = lit ? blurLit : blurBoard;
+                        ctx.fillStyle    = color;
+                        ctx.fillText(board[r][c], cx, cy);
 
                     } else if (visualMode === 1) {
-                        // ── BLOCK mode: solid filled rectangles ──────────────
-                        ctx.shadowBlur = lit ? blurLit : blurBoard;
-                        if (lit) {
-                            ctx.fillStyle = isOne ? 'rgba(255,215,0,0.85)' : 'rgba(255,68,68,0.7)';
-                        } else {
-                            // 1s = 50% opacity, 0s = 20% opacity so they look different
-                            ctx.fillStyle = isOne ? 'rgba(0,255,204,0.5)' : 'rgba(0,255,204,0.18)';
-                        }
-                        ctx.fillRect(bx, by, bw, bh);
-                        ctx.shadowBlur = 0;
+                        // ── BLOCK: filled rounded rect + digit on top ─────────
+                        ctx.shadowColor = color;
+                        ctx.shadowBlur  = lit ? blurLit : blurBoard;
+                        ctx.fillStyle   = lit
+                            ? (isOne ? 'rgba(255,215,0,0.88)' : 'rgba(255,68,68,0.75)')
+                            : (isOne ? 'rgba(0,255,204,0.48)'  : 'rgba(0,255,204,0.18)');
+                        drawRRect(ctx, bx, by, bw, bh, radius);
+                        ctx.fill();
+                        ctx.shadowBlur  = 0;
                         ctx.strokeStyle = color;
-                        ctx.lineWidth = 1.5;
-                        ctx.strokeRect(bx, by, bw, bh);
+                        ctx.lineWidth   = 1.5;
+                        drawRRect(ctx, bx, by, bw, bh, radius);
+                        ctx.stroke();
+                        // Digit label on top (dark so it reads against the fill)
+                        ctx.font         = `bold ${labelPx}px monospace`;
+                        ctx.textAlign    = 'center';
+                        ctx.textBaseline = 'middle';
+                        ctx.shadowBlur   = 0;
+                        ctx.fillStyle    = lit ? '#1a0a00' : '#001a14';
+                        ctx.fillText(board[r][c], cx, cy);
 
                     } else {
-                        // ── LINE mode: pattern-filled blocks ─────────────────
+                        // ── LINE: patterned rounded rect + glowing digit ──────
                         ctx.save();
-                        ctx.beginPath(); ctx.rect(bx, by, bw, bh); ctx.clip();
-
-                        // Faint cell background
+                        drawRRect(ctx, bx, by, bw, bh, radius);
+                        ctx.clip();
+                        // Faint background tint
                         ctx.fillStyle = lit
                             ? (isOne ? 'rgba(255,215,0,0.10)' : 'rgba(255,68,68,0.10)')
                             : 'rgba(0,255,204,0.05)';
                         ctx.fillRect(bx, by, bw, bh);
-
-                        // Stripe / hatch lines
+                        // Pattern lines
                         ctx.strokeStyle = color;
                         ctx.lineWidth   = 1;
-                        ctx.shadowBlur  = lit ? blurLit * 0.5 : blurBoard * 0.5;
+                        ctx.shadowColor = color;
+                        ctx.shadowBlur  = lit ? blurLit * 0.4 : blurBoard * 0.4;
                         const sp = Math.max(4, Math.round(CELL / 6));
-
                         if (isOne) {
-                            // Horizontal stripes for 1s
                             for (let py = by + sp; py < by + bh; py += sp) {
                                 ctx.beginPath(); ctx.moveTo(bx, py); ctx.lineTo(bx + bw, py); ctx.stroke();
                             }
                         } else {
-                            // Diagonal hatching for 0s
                             for (let d = -bh; d < bw + bh; d += sp) {
-                                ctx.beginPath();
-                                ctx.moveTo(bx + d, by); ctx.lineTo(bx + d + bh, by + bh);
-                                ctx.stroke();
+                                ctx.beginPath(); ctx.moveTo(bx + d, by); ctx.lineTo(bx + d + bh, by + bh); ctx.stroke();
                             }
                         }
                         ctx.restore();
-
                         // Glowing border
                         ctx.shadowColor = color;
                         ctx.shadowBlur  = lit ? blurLit : blurBoard;
                         ctx.strokeStyle = color;
                         ctx.lineWidth   = 1.5;
-                        ctx.strokeRect(bx, by, bw, bh);
+                        drawRRect(ctx, bx, by, bw, bh, radius);
+                        ctx.stroke();
                         ctx.shadowBlur  = 0;
+                        // Digit on top (glowing, same colour as the lines)
+                        ctx.font         = `bold ${labelPx}px monospace`;
+                        ctx.textAlign    = 'center';
+                        ctx.textBaseline = 'middle';
+                        ctx.shadowColor  = color;
+                        ctx.shadowBlur   = Math.round(blurBoard * 0.6);
+                        ctx.fillStyle    = color;
+                        ctx.fillText(board[r][c], cx, cy);
+                        ctx.shadowBlur   = 0;
                     }
                 }
             }
 
-            // Falling piece always renders as white digits (mode-independent)
+            // ── Falling piece ───────────────────────────────────────────────────
             if (currentPiece) {
-                ctx.font = `bold ${digitPx}px monospace`;
-                ctx.textAlign    = 'center';
-                ctx.textBaseline = 'middle';
                 const pos = getPiecePositions(currentPiece);
-                ctx.shadowColor = '#ffffff';
-                ctx.shadowBlur  = blurPiece;
-                ctx.fillStyle   = '#ffffff';
-                for (let p of pos) {
-                    if (p.r >= 0) ctx.fillText(p.d, p.c*CELL + CELL/2, p.r*CELL + CELL/2 + 2);
+                if (visualMode === 0) {
+                    // DIGIT mode: plain white glowing digits
+                    ctx.font = `bold ${digitPx}px monospace`;
+                    ctx.textAlign    = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.shadowColor  = '#ffffff';
+                    ctx.shadowBlur   = blurPiece;
+                    ctx.fillStyle    = '#ffffff';
+                    for (const p of pos) {
+                        if (p.r >= 0) ctx.fillText(p.d, p.c*CELL + CELL/2, p.r*CELL + CELL/2 + 2);
+                    }
+                    ctx.shadowBlur = 0;
+                } else {
+                    // BLOCK / LINE: each of the 4 positions gets its own Tetris colour
+                    for (let i = 0; i < pos.length; i++) {
+                        const p = pos[i];
+                        if (p.r < 0) continue;
+                        const pc  = PIECE_COLORS[i % PIECE_COLORS.length];
+                        const bx  = p.c * CELL + 2, by = p.r * CELL + 2;
+                        const bw  = CELL - 4,        bh = CELL - 4;
+                        const cx2 = p.c * CELL + CELL / 2;
+                        const cy2 = p.r * CELL + CELL / 2 + 2;
+
+                        ctx.shadowColor = pc;
+                        ctx.shadowBlur  = blurPiece;
+                        ctx.fillStyle   = pc;
+                        drawRRect(ctx, bx, by, bw, bh, radius);
+                        ctx.fill();
+                        ctx.shadowBlur  = 0;
+                        ctx.strokeStyle = '#ffffff';
+                        ctx.lineWidth   = 1;
+                        drawRRect(ctx, bx, by, bw, bh, radius);
+                        ctx.stroke();
+                        // Digit in dark colour so it reads against bright block
+                        ctx.font         = `bold ${labelPx}px monospace`;
+                        ctx.textAlign    = 'center';
+                        ctx.textBaseline = 'middle';
+                        ctx.fillStyle    = '#0a0a1f';
+                        ctx.fillText(p.d, cx2, cy2);
+                    }
                 }
-                ctx.shadowBlur = 0;
             }
         }
         
