@@ -446,7 +446,7 @@
         </div>
         <div style="display: flex; gap: 15px; align-items: center;">
             <button id="menu-btn" onclick="openMenu()">MENU</button>
-            <button id="vis-btn"  onclick="cycleVisualMode()" title="Toggle visual mode">DIGIT</button>
+            <button id="vis-btn"  onclick="cycleVisualMode()" title="Toggle visual mode">BLOCK</button>
             <button id="sfx-btn"  title="Toggle sound">🔊</button>
             <button id="pause-btn">PAUSE</button>
             <button id="restart-btn">START</button>
@@ -467,7 +467,7 @@
             <div id="menu-overlay" class="menu-overlay">
                 <div class="menu-title">— MENU —</div>
                 <div class="menu-btn-col">
-                    <button id="menu-vis-btn"    onclick="cycleVisualMode()">🎨&nbsp; DIGIT</button>
+                    <button id="menu-vis-btn"    onclick="cycleVisualMode()">🎨&nbsp; BLOCK</button>
                     <button id="menu-sfx-btn"    onclick="toggleSoundFromMenu()">🔊&nbsp; SOUND ON</button>
                     <button id="menu-resume-btn" onclick="closeMenu()">▶&nbsp; RESUME</button>
                     <button                       onclick="restartFromMenu()">↺&nbsp; RESTART</button>
@@ -609,8 +609,8 @@
 
         // ── Audio ────────────────────────────────────────────────────────────────
         let soundEnabled = true;
-        let visualMode = 0; // 0=DIGIT  1=BLOCK  2=LINE
-        const VIS_NAMES = ['DIGIT', 'BLOCK', 'LINE'];
+        let visualMode = 1; // 0=DIGITAL  1=BLOCK (default)  2=LINES
+        const VIS_NAMES = ['DIGITAL', 'BLOCK', 'LINES'];
 
         // Tetris-style colours for the 4 falling piece positions (BLOCK / LINE modes)
         const PIECE_COLORS = ['#FF6B6B', '#FFD93D', '#6BCB77', '#A78BFA'];
